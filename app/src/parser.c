@@ -262,6 +262,39 @@ __Z_INLINE parser_error_t parser_formatAmount(uint16_t amountToken,
     uint8_t dummy;
     return parser_formatAmountItem(showItemTokenIdx, outVal, outValLen, showPageIdx, &dummy);
 }
+__Z_INLINE parser_error_t parser_replace_vote(uint16_t voteIndex,
+                                              char *outVal, uint16_t outValLen,
+                                              uint8_t pageIdx, uint8_t *pageCount) {
+    *pageCount = 0;
+    
+    char bufferUI[14];
+    MEMZERO(outVal, outValLen);
+    MEMZERO(bufferUI, sizeof(bufferUI));
+
+    const uint8_t *votePtr = (uint8_t*)(parser_tx_obj.tx + parser_tx_obj.json.tokens[voteIndex].start);
+    const int32_t voteLen = parser_tx_obj.json.tokens[voteIndex].end -
+                             parser_tx_obj.json.tokens[voteIndex].start;
+    
+    if (memcmp(votePtr, "1", voteLen) == 0) {
+         snprintf(bufferUI, sizeof(bufferUI), "Yes"); 
+    }
+    else if (memcmp(votePtr, "2", voteLen) == 0) {
+         snprintf(bufferUI, sizeof(bufferUI), "Abstain"); 
+    }
+    else if (memcmp(votePtr, "3", voteLen) == 0) {
+         snprintf(bufferUI, sizeof(bufferUI), "No"); 
+    }
+    else if (memcmp(votePtr, "4", voteLen) == 0) {
+         snprintf(bufferUI, sizeof(bufferUI), "No with Veto"); 
+    }
+    else {
+         tx_getToken(voteIndex, outVal, outValLen, pageIdx, pageCount);
+         return parser_ok;
+    }
+    pageString(outVal, outValLen, bufferUI, pageIdx, pageCount);
+
+    return parser_ok;
+}
 
 parser_error_t parser_getItem(const parser_context_t *ctx,
                               uint8_t displayIdx,
@@ -296,6 +329,10 @@ parser_error_t parser_getItem(const parser_context_t *ctx,
         CHECK_PARSER_ERR(parser_formatAmount(ret_value_token_index,
                                              outVal, outValLen,
                                              pageIdx, pageCount))
+    } else if (strcmp(tmpKey, "msgs/value/option") == 0 && !tx_is_expert_mode()) {
+    	CHECK_PARSER_ERR(parser_replace_vote(ret_value_token_index,
+                                    outVal, outValLen,
+                                    pageIdx, pageCount))
     } else {
         CHECK_PARSER_ERR(tx_getToken(ret_value_token_index,
                                      outVal, outValLen,
